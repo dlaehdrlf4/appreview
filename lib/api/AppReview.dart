@@ -4,10 +4,10 @@ import 'package:http/http.dart' as http;
 import '../model/AppReviewModel.dart';
 
 class AppReview {
-  Future<dynamic> get() async {
+  Future<dynamic> get(String start, String end) async {
     try {
-      http.Response response =
-          await http.get(Uri.parse("http://10.130.110.80:9000/appreview"));
+      http.Response response = await http.get(Uri.parse(
+          "http://10.130.110.80:9000/appreview?start_date=$start&end_date=$end"));
       if (response.statusCode != 200) {
         return null;
       }

@@ -1,9 +1,13 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:app_review/api/AppReview.dart';
 import 'package:app_review/model/AppReviewModel.dart';
 import 'package:app_review/screen/second_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
 
 class ReviewScreen extends StatefulWidget {
   const ReviewScreen({super.key});
@@ -24,20 +28,23 @@ class _ReviewScreenState extends State<ReviewScreen> {
   String searchQuery = "";
   DateTime? startDate;
   DateTime? endDate;
+  //String? selectedPlatform;
+
+  // final Map<String, List<String>> platformMapping = {
+  //   'AOS': ['EBR-01'], // Example mapping
+  //   'iOS': ['EBR-02'], // Example mapping
+  //   'Cafe': ['EBR-03'], // Example mapping
+  // };
 
   @override
   void initState() {
     super.initState();
+
     getReview().then((data) {
       setState(() {
         isLoading = false;
       });
     });
-    // fetchAllModels().then((_) {
-    //   setState(() {
-    //     isLoading = false;
-    //   });
-    // });
   }
 
   @override
@@ -90,30 +97,105 @@ class _ReviewScreenState extends State<ReviewScreen> {
               refreshDate(),
               dateSelectionButton('start'),
               dateSelectionButton('end'),
+              // DropdownButton<String?>(
+              //   value: selectedPlatform,
+              //   onChanged: (String? newValue) {
+              //     setState(() {
+              //       selectedPlatform = newValue;
+              //       getReview();
+              //     });
+              //   },
+              //   items: [null, 'AOS', 'iOS', 'Cafe'].map<DropdownMenuItem<String?>>((String? i) {
+              //     return DropdownMenuItem<String?>(
+              //       value: i,
+              //       child: Text({'AOS': '안드로이드', 'iOS': '아이폰', 'Cafe': '카페'}[i] ?? '전체'),
+              //     );
+              //   }).toList(),
+              // ),
             ],
           ),
           Expanded(
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : ListView.separated(
-                    itemBuilder: (context, index) {
-                      return ListTile(
-                        title: Text(
-                          '${currentModels[index].title}',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                : currentModels.isEmpty
+                    ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.info,
+                              size: 30,
+                            ),
+                            SizedBox(
+                              height: 8,
+                            ),
+                            Text(
+                              '데이터가 없습니다.',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 20),
+                            ),
+                          ],
                         ),
-                        subtitle: Text(
-                          '${currentModels[index].comment}',
-                        ),
-                        trailing: Text(
-                          '${currentModels[index].createDt}',
-                        ),
-                      );
-                    },
-                    separatorBuilder: (BuildContext context, int index) =>
-                        const Divider(),
-                    itemCount: currentModels.length,
-                  ),
+                      )
+                    : ListView.separated(
+                        itemBuilder: (context, index) {
+                          DateTime dateTime =
+                              DateTime.parse(currentModels[index].createDt);
+
+                          DateTime now = DateTime.now();
+
+                          bool isSameDate = (dateTime.year == now.year &&
+                              dateTime.month == now.month &&
+                              dateTime.day == now.day);
+
+                          print("두 날짜가 같은지 여부: $isSameDate");
+                          print('link :${currentModels[index].link}');
+                          return InkWell(
+                            onTap: () async {
+                              if (currentModels[index].link == '') {
+                              } else {
+                                final url = currentModels[index].link;
+                                if (await canLaunch(url)) {
+                                  await launch(
+                                    url,
+                                    forceSafariVC: false,
+                                    forceWebView: false,
+                                    enableJavaScript: true,
+                                  );
+                                } else {
+                                  throw 'Could not launch $url';
+                                }
+                              }
+                            },
+                            child: ListTile(
+                              leading: isSameDate
+                                  ? const Text(
+                                      'NEW',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.red,
+                                          fontSize: 12,
+                                          fontStyle: FontStyle.italic),
+                                    )
+                                  : null,
+                              title: Text(
+                                '${currentModels[index].title}',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Text(
+                                '${currentModels[index].comment}',
+                              ),
+                              trailing: Text(
+                                '${currentModels[index].createDt}',
+                              ),
+                            ),
+                          );
+                        },
+                        separatorBuilder: (BuildContext context, int index) =>
+                            const Divider(),
+                        itemCount: currentModels.length,
+                      ),
           ),
           pagination(),
         ],
@@ -123,10 +205,32 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
   Future<void> getReview() async {
     try {
-      AppReviewModel appReviewModel = await AppReview().get();
+      String startTime = '';
+      String endTime = '';
+      if (startDate == null && endDate == null) {
+        startTime =
+            '${DateTime.now().year.toString()}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}';
+        endTime =
+            '${DateTime.now().year.toString()}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}';
+      } else {
+        //${date.year}-${date.month}-${date.day}
+        startTime =
+            '${startDate?.year}-${startDate?.month.toString().padLeft(2, '0')}-${startDate?.day.toString().padLeft(2, '0')}';
+        if (endDate == null) {
+          endTime =
+              '${DateTime.now().year.toString()}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}';
+        } else {
+          endTime =
+              '${endDate?.year}-${endDate?.month.toString().padLeft(2, '0')}-${endDate?.day.toString().padLeft(2, '0')}';
+        }
+      }
+
+      AppReviewModel appReviewModel = await AppReview().get(startTime, endTime);
+      print(appReviewModel.data.length);
       allModels = appReviewModel.data;
       totalPages = (allModels.length / pageSize).ceil();
       setCurrentPage(1);
+      setState(() {});
     } catch (e) {}
   }
 
@@ -164,7 +268,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
           item.comment.toLowerCase().contains(searchQuery.toLowerCase()) ||
           item.title.toLowerCase().contains(searchQuery.toLowerCase()));
 
-      return matchesDate && matchesQuery;
+      //bool matchesPlatform = (selectedPlatform == null || platformMapping[selectedPlatform]!.contains(item.type));
+
+      return matchesDate && matchesQuery; //&& matchesPlatform;
     }).toList();
 
     totalPages = (filteredList.length / pageSize).ceil();
@@ -215,14 +321,13 @@ class _ReviewScreenState extends State<ReviewScreen> {
       lastDate: DateTime(2100),
     );
     if (picked != null) {
-      setState(() {
-        if (dateType == "start") {
-          startDate = picked;
-        } else {
-          endDate = picked;
-        }
-        filterSearchResults();
-      });
+      if (dateType == "start") {
+        startDate = picked;
+      } else {
+        endDate = picked;
+      }
+      await getReview();
+      setState(() {});
     }
   }
 
@@ -233,24 +338,44 @@ class _ReviewScreenState extends State<ReviewScreen> {
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: OutlinedButton(
-        onPressed: () => _selectDate(context, dateType),
+        onPressed: () {
+          setState(() {
+            _selectDate(context, dateType);
+          });
+        },
         child: Text(date == null
-            ? '$label 선택'
-            : '$label: ${date.year}-${date.month}-${date.day}'),
+            ? '$label: ${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}'
+            : '$label: ${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}'),
       ),
     );
   }
+  // Widget dateSelectionButton(String dateType) {
+  //   DateTime? date = dateType == "start" ? startDate : endDate;
+  //   String label = dateType == "start" ? "시작 날짜" : "종료 날짜";
+  //   return Padding(
+  //     padding: const EdgeInsets.all(8.0),
+  //     child: OutlinedButton(
+  //       onPressed: () {
+  //         setState(() {
+  //           _selectDate(context, dateType);
+  //         });
+  //       },
+  //       child: Text(
+  //           date == null ? '$label 선택' : '$label: ${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day}'),
+  //     ),
+  //   );
+  // }
 
   Widget refreshDate() {
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: OutlinedButton(
-        onPressed: () {
+        onPressed: () async {
           setState(() {
             startDate = null;
             endDate = null;
-            filterSearchResults();
           });
+          getReview();
         },
         child: const Text('날짜 초기화'),
       ),
