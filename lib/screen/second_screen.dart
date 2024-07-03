@@ -10,7 +10,7 @@ class SecondScreen extends StatelessWidget {
         iconTheme: const IconThemeData(color: Colors.white),
         backgroundColor: Colors.black,
         title: const Text(
-          '차지비 리뷰 모음',
+          '차지비 리뷰 크롤링',
           style: TextStyle(color: Colors.white),
         ),
       ),

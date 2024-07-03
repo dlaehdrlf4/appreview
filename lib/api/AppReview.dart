@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:developer';
+import 'dart:developer' as developer;
 import 'package:http/http.dart' as http;
 import '../model/AppReviewModel.dart';
 
@@ -11,13 +11,12 @@ class AppReview {
       if (response.statusCode != 200) {
         return null;
       }
-      print(response.statusCode);
-      print(response.body.runtimeType);
       // final Map<String, dynamic> decodedJson = json.decode(response.body);
       return AppReviewModel.fromJson(
           json.decode(utf8.decode(response.bodyBytes)));
     } catch (error) {
       print(error.toString());
+      developer.log('asdfsf');
       return null;
     }
   }

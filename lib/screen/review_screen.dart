@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:developer' as dev;
 import 'dart:math';
 
 import 'package:app_review/api/AppReview.dart';
 import 'package:app_review/model/AppReviewModel.dart';
 import 'package:app_review/screen/second_screen.dart';
+import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -28,13 +30,21 @@ class _ReviewScreenState extends State<ReviewScreen> {
   String searchQuery = "";
   DateTime? startDate;
   DateTime? endDate;
-  //String? selectedPlatform;
+  String? selectedPlatform;
 
-  // final Map<String, List<String>> platformMapping = {
-  //   'AOS': ['EBR-01'], // Example mapping
-  //   'iOS': ['EBR-02'], // Example mapping
-  //   'Cafe': ['EBR-03'], // Example mapping
-  // };
+  final Map<String, String> platformMapping = {
+    'AOS': 'EBR-01',
+    'iOS': 'EBR-02',
+    'Cafe': 'EBR-03',
+  };
+
+  final List<String?> platforms = [null, 'AOS', 'iOS', 'Cafe'];
+  final Map<String?, String> platformLabels = {
+    null: '전체',
+    'AOS': '안드로이드',
+    'iOS': '아이폰',
+    'Cafe': '카페'
+  };
 
   @override
   void initState() {
@@ -105,13 +115,72 @@ class _ReviewScreenState extends State<ReviewScreen> {
               //       getReview();
               //     });
               //   },
-              //   items: [null, 'AOS', 'iOS', 'Cafe'].map<DropdownMenuItem<String?>>((String? i) {
+              //   items: [null, 'AOS', 'iOS', 'Cafe']
+              //       .map<DropdownMenuItem<String?>>((String? i) {
               //     return DropdownMenuItem<String?>(
               //       value: i,
-              //       child: Text({'AOS': '안드로이드', 'iOS': '아이폰', 'Cafe': '카페'}[i] ?? '전체'),
+              //       child: Text({
+              //             'AOS': '안드로이드',
+              //             'iOS': '아이폰',
+              //             'Cafe': '카페'
+              //           }[i] ??
+              //           '전체'),
               //     );
               //   }).toList(),
               // ),
+              DropdownButtonHideUnderline(
+                child: DropdownButton2<String?>(
+                  isExpanded: true,
+                  value: selectedPlatform,
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      selectedPlatform = newValue;
+                      getReview();
+                    });
+                  },
+                  items: platforms
+                      .map<DropdownMenuItem<String?>>((String? platform) {
+                    return DropdownMenuItem<String?>(
+                      value: platform,
+                      child: Row(
+                        children: [
+                          const SizedBox(
+                            width: 8,
+                          ),
+                          Text(platformLabels[platform] ?? '전체'),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  buttonStyleData: ButtonStyleData(
+                    height: 40,
+                    width: 200,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                  dropdownStyleData: DropdownStyleData(
+                    maxHeight: 200,
+                    width: 200,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      color: Colors.white,
+                    ),
+                    offset: const Offset(0, 0),
+                    scrollbarTheme: ScrollbarThemeData(
+                      radius: const Radius.circular(40),
+                      thickness: MaterialStateProperty.all(6),
+                      thumbVisibility: MaterialStateProperty.all(true),
+                    ),
+                  ),
+                  menuItemStyleData: MenuItemStyleData(
+                    height: 40,
+                  ),
+                ),
+              ),
             ],
           ),
           Expanded(
@@ -149,8 +218,6 @@ class _ReviewScreenState extends State<ReviewScreen> {
                               dateTime.month == now.month &&
                               dateTime.day == now.day);
 
-                          print("두 날짜가 같은지 여부: $isSameDate");
-                          print('link :${currentModels[index].link}');
                           return InkWell(
                             onTap: () async {
                               if (currentModels[index].link == '') {
@@ -226,8 +293,18 @@ class _ReviewScreenState extends State<ReviewScreen> {
       }
 
       AppReviewModel appReviewModel = await AppReview().get(startTime, endTime);
-      print(appReviewModel.data.length);
-      allModels = appReviewModel.data;
+
+      if (selectedPlatform == null) {
+        allModels = appReviewModel.data;
+      } else {
+        try {
+          allModels = appReviewModel.data.where((element) {
+            return element.type == platformMapping[selectedPlatform];
+          }).toList();
+        } catch (e) {
+          dev.log(e.toString());
+        }
+      }
       totalPages = (allModels.length / pageSize).ceil();
       setCurrentPage(1);
       setState(() {});
@@ -268,7 +345,8 @@ class _ReviewScreenState extends State<ReviewScreen> {
           item.comment.toLowerCase().contains(searchQuery.toLowerCase()) ||
           item.title.toLowerCase().contains(searchQuery.toLowerCase()));
 
-      //bool matchesPlatform = (selectedPlatform == null || platformMapping[selectedPlatform]!.contains(item.type));
+      bool matchesPlatform = (selectedPlatform == null ||
+          platformMapping[selectedPlatform]!.contains(item.type));
 
       return matchesDate && matchesQuery; //&& matchesPlatform;
     }).toList();
@@ -374,10 +452,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
           setState(() {
             startDate = null;
             endDate = null;
+            selectedPlatform = null;
           });
           getReview();
         },
-        child: const Text('날짜 초기화'),
+        child: const Text('초기화'),
       ),
     );
   }
